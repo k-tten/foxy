@@ -5,6 +5,7 @@ import com.k_tten.foxy.fabric.config.ModConfig
 import com.mojang.blaze3d.platform.InputConstants
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents
+import net.minecraft.ChatFormatting
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ChatScreen
@@ -455,8 +456,7 @@ class FruitDigging(private val config: ModConfig) {
             Optional.empty<Any>()
         }, Style.EMPTY)
 
-        val messageText = combinedText.toString()
-        val optionMatch = AUTOSTART_OPTION_PATTERN.find(messageText) ?: return
+        val optionMatch = AUTOSTART_OPTION_PATTERN.find(combinedText.toString()) ?: return
         val clickEvent = spans.firstNotNullOfOrNull { (start, end, event) ->
             if (event != null && start < optionMatch.range.last + 1 && end > optionMatch.range.first) {
                 event
@@ -483,32 +483,20 @@ class FruitDigging(private val config: ModConfig) {
 
     private fun runChatClickEvent(clickEvent: ClickEvent): Boolean {
         try {
-            val action = invokeNoArg(clickEvent, "action", "getAction")
-            val actionName = action?.let { invokeNoArg(it, "getSerializedName", "name")?.toString() }
-                ?: action?.toString()
-            if (!actionName.equals("run_command", ignoreCase = true)) {
-                chatLog("Autostart option is not a run-command chat action.")
+            val handleClick = Screen::class.java.getDeclaredMethod(
+                "defaultHandleGameClickEvent",
+                ClickEvent::class.java,
+                Minecraft::class.java,
+                Screen::class.java
+            )
+            if (!handleClick.trySetAccessible()) {
+                FoxyFabric.LOGGER.error("Could not access Minecraft's chat click-event handler")
+                chatLog("Autostart could not activate the NPC option.")
                 return false
             }
 
-            val command = invokeNoArg(clickEvent, "command", "getValue") as? String
-            if (command.isNullOrBlank()) {
-                chatLog("Autostart option did not provide a command.")
-                return false
-            }
-
-            val connection = Minecraft.getInstance().player?.connection
-            val sendCommand = connection?.javaClass?.methods?.firstOrNull {
-                it.name == "sendCommand" &&
-                    it.parameterCount == 1 &&
-                    it.parameterTypes[0] == String::class.java
-            }
-            if (connection == null || sendCommand == null) {
-                chatLog("Autostart could not send the NPC option command.")
-                return false
-            }
-
-            sendCommand.invoke(connection, command.removePrefix("/"))
+            val client = Minecraft.getInstance()
+            handleClick.invoke(null, clickEvent, client, currentScreen(client))
             return true
         } catch (exception: ReflectiveOperationException) {
             FoxyFabric.LOGGER.error("Could not activate the Fruit Digging NPC chat option", exception)
@@ -517,11 +505,17 @@ class FruitDigging(private val config: ModConfig) {
         }
     }
 
-    private fun invokeNoArg(instance: Any, vararg methodNames: String): Any? {
-        val method = instance.javaClass.methods.firstOrNull {
-            it.name in methodNames && it.parameterCount == 0
-        } ?: return null
-        return method.invoke(instance)
+    private fun currentScreen(client: Minecraft): Screen? {
+        val gui = client.gui
+        val screenAccessor = gui.javaClass.methods.firstOrNull {
+            it.name == "screen" && it.parameterCount == 0
+        }
+        val screen = if (screenAccessor != null) {
+            screenAccessor.invoke(gui)
+        } else {
+            client.javaClass.getField("screen").get(client)
+        }
+        return screen as? Screen
     }
 
     private fun clearAutostart() {
@@ -670,7 +664,14 @@ class FruitDigging(private val config: ModConfig) {
         if (!config.verbose) return
 
         val player = Minecraft.getInstance().player ?: return
-        val component = Component.literal("$LOG_PREFIX $message")
+        val component = Component.empty()
+            .append(Component.literal("[").withStyle(ChatFormatting.LIGHT_PURPLE))
+            .append(Component.literal("F").withStyle(ChatFormatting.RED))
+            .append(Component.literal("o").withStyle(Style.EMPTY.withColor(LIGHT_GREEN_COLOR)))
+            .append(Component.literal("x").withStyle(ChatFormatting.YELLOW))
+            .append(Component.literal("y").withStyle(ChatFormatting.AQUA))
+            .append(Component.literal("] ").withStyle(Style.EMPTY.withColor(ORANGE_COLOR)))
+            .append(message)
         try {
             val systemMessageMethod = player.javaClass.methods.firstOrNull {
                 it.name == "sendSystemMessage" && it.parameterCount == 1
@@ -735,6 +736,8 @@ class FruitDigging(private val config: ModConfig) {
         const val CENTER_MOVE_DELAY_NANOS = 2_000_000_000L
         const val MAX_LOG_MESSAGE_LENGTH = 120
         const val LOG_PREFIX = "[Foxy]"
+        const val LIGHT_GREEN_COLOR = 0x55FF55
+        const val ORANGE_COLOR = 0xFFAA00
         val COLOR_CODE_PATTERN = Regex("§[0-9A-FK-ORa-fk-or]")
         val WHITESPACE_PATTERN = Regex("\\s+")
         const val ROTATION_DURATION_NANOS = 200_000_000L
