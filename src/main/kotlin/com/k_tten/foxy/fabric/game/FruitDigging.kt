@@ -2,8 +2,10 @@ package com.k_tten.foxy.fabric.game
 
 import com.k_tten.foxy.fabric.FoxyFabric
 import com.k_tten.foxy.fabric.config.ModConfig
+import com.mojang.blaze3d.platform.InputConstants
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents
+import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.gui.screens.Screen
@@ -12,11 +14,9 @@ import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
-import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.Entity
-import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
+import net.minecraft.world.level.block.Blocks
 import java.util.Optional
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -401,19 +401,10 @@ class FruitDigging(private val config: ModConfig) {
                 autostartExpectedPitch = player.xRot
                 if (!rotationComplete) return
 
-                val gameMode = client.gameMode
-                if (gameMode == null) {
-                    chatLog("Autostart stopped: game interaction is unavailable.")
-                    clearAutostart()
-                    return
-                }
-                if (!interactWithNpc(gameMode, player, npc)) {
-                    clearAutostart()
-                    return
-                }
+                KeyMapping.click(InputConstants.Type.MOUSE.getOrCreate(RIGHT_MOUSE_BUTTON))
                 autostartStage = AutostartStage.WAIT_FOR_OPTION
                 autostartDeadline = now + AUTOSTART_PROMPT_TIMEOUT_NANOS
-                chatLog("Interacted with Carnival Pirateman. Waiting for the autostart option.")
+                chatLog("Right-clicked Carnival Pirateman. Waiting for the autostart option.")
             }
         }
     }
@@ -455,20 +446,24 @@ class FruitDigging(private val config: ModConfig) {
     private fun handleAutostartOption(message: Component) {
         if (autostartStage != AutostartStage.WAIT_FOR_OPTION) return
 
-        var matchingOptionFound = false
-        var matchingClickEvent: ClickEvent? = null
-        message.visit({ style, text ->
-            if (!matchingOptionFound &&
-                text.contains(AUTOSTART_OPTION_TEXT, ignoreCase = true)
-            ) {
-                matchingOptionFound = true
-                matchingClickEvent = style.clickEvent
-            }
+        val combinedText = StringBuilder()
+        val spans = mutableListOf<Triple<Int, Int, ClickEvent?>>()
+        message.visit({ style, segment ->
+            val start = combinedText.length
+            combinedText.append(segment)
+            spans += Triple(start, combinedText.length, style.clickEvent)
             Optional.empty<Any>()
         }, Style.EMPTY)
 
-        if (!matchingOptionFound) return
-        val clickEvent = matchingClickEvent
+        val messageText = combinedText.toString()
+        val optionMatch = AUTOSTART_OPTION_PATTERN.find(messageText) ?: return
+        val clickEvent = spans.firstNotNullOfOrNull { (start, end, event) ->
+            if (event != null && start < optionMatch.range.last + 1 && end > optionMatch.range.first) {
+                event
+            } else {
+                null
+            }
+        }
         if (clickEvent == null) {
             if (!autostartOptionWithoutClickLogged) {
                 chatLog("Found the autostart option, but it has no clickable action.")
@@ -518,40 +513,6 @@ class FruitDigging(private val config: ModConfig) {
         } catch (exception: ReflectiveOperationException) {
             FoxyFabric.LOGGER.error("Could not activate the Fruit Digging NPC chat option", exception)
             chatLog("Autostart failed while selecting the NPC option.")
-            return false
-        }
-    }
-
-    private fun interactWithNpc(gameMode: Any, player: LocalPlayer, npc: Entity): Boolean {
-        try {
-            val interact = gameMode.javaClass.methods.firstOrNull { method ->
-                method.name == "interact" &&
-                    ((method.parameterCount == 3 &&
-                        method.parameterTypes[2] == InteractionHand::class.java) ||
-                        (method.parameterCount == 4 &&
-                            method.parameterTypes[2] == EntityHitResult::class.java))
-            }
-            if (interact == null) {
-                chatLog("Autostart failed: no compatible NPC interaction method was found.")
-                FoxyFabric.LOGGER.error("No compatible NPC interaction method found")
-                return false
-            }
-
-            if (interact.parameterCount == 3) {
-                interact.invoke(gameMode, player, npc, InteractionHand.MAIN_HAND)
-            } else {
-                interact.invoke(
-                    gameMode,
-                    player,
-                    npc,
-                    EntityHitResult(npc, npc.boundingBox.center),
-                    InteractionHand.MAIN_HAND
-                )
-            }
-            return true
-        } catch (exception: ReflectiveOperationException) {
-            FoxyFabric.LOGGER.error("Could not interact with Carnival Pirateman", exception)
-            chatLog("Autostart failed while interacting with Carnival Pirateman.")
             return false
         }
     }
@@ -751,6 +712,11 @@ class FruitDigging(private val config: ModConfig) {
         const val SHOVEL_MESSAGE = "[NPC] Carnival Pirateman: Here's yer shovel, then."
         const val FRUIT_DIGGING_MESSAGE = "                               Fruit Digging"
         const val AUTOSTART_OPTION_TEXT = "Aye sure do!"
+        const val RIGHT_MOUSE_BUTTON = 1
+        val AUTOSTART_OPTION_PATTERN = Regex(
+            """\[\s*${Regex.escape(AUTOSTART_OPTION_TEXT)}\s*\]""",
+            RegexOption.IGNORE_CASE
+        )
         const val CARNIVAL_PIRATEMAN_NAME = "Carnival Pirateman"
         const val NPC_SEARCH_RADIUS_SQUARED = 25.0
         const val AUTOSTART_NPC_DELAY_NANOS = 3_000_000_000L
