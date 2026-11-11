@@ -1,0 +1,26 @@
+{
+    "schemaVersion": 1,
+    "id": "${id}",
+    "version": "${version}",
+    "name": "${name}",
+    "description": "A Fabric mod starter.",
+    "authors": ["k-tten"],
+    "license": "MIT",
+    "environment": "client",
+    "entrypoints": {
+        "main": [
+            {
+                "value": "com.k_tten.foxy.fabric.FoxyFabric",
+                "adapter": "kotlin"
+            }
+        ]
+    },
+    "depends": {
+        "fabricloader": ">=${fabric_loader}",
+        "minecraft": "${minecraft}",
+        "java": ">=${java_version}",
+        "fabric-api": "*",
+        "fabric-language-kotlin": "*"
+    },
+    "icon": "assets/foxy/icon.png"
+}
