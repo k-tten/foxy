@@ -71,6 +71,7 @@ class FruitDigging(private val config: ModConfig) {
     private var centerMoveStarted = false
     private var waitingForMouseLogged = false
     private var completedBlocks = 0
+    private var manualAutostart = false
 
     fun register() {
         ClientReceiveMessageEvents.CHAT.register { message, _, _, _, _ ->
@@ -307,8 +308,18 @@ class FruitDigging(private val config: ModConfig) {
         }
     }
 
-    private fun beginAutostart() {
-        if (!config.autostart || !config.fruitDigging || autostartStage != AutostartStage.IDLE) return
+    fun startAutostartManually(): Boolean {
+        if (!config.fruitDigging || stage != Stage.IDLE ||
+            autostartStage != AutostartStage.IDLE
+        ) return false
+        beginAutostart(manual = true)
+        return autostartStage != AutostartStage.IDLE
+    }
+
+    private fun beginAutostart(manual: Boolean = false) {
+        if ((!manual && !config.autostart) || !config.fruitDigging ||
+            autostartStage != AutostartStage.IDLE
+        ) return
 
         val client = Minecraft.getInstance()
         val player = client.player
@@ -332,11 +343,12 @@ class FruitDigging(private val config: ModConfig) {
         autostartStage = AutostartStage.WAIT_BEFORE_NPC
         autostartDeadline = System.nanoTime() + AUTOSTART_NPC_DELAY_NANOS
         autostartOptionWithoutClickLogged = false
+        manualAutostart = manual
         chatLog("Autostart will interact with Carnival Pirateman in 3 seconds.")
     }
 
     private fun tickAutostart(client: Minecraft) {
-        if (!config.autostart || !config.fruitDigging) {
+        if ((!config.autostart && !manualAutostart) || !config.fruitDigging) {
             clearAutostart()
             return
         }
@@ -523,6 +535,7 @@ class FruitDigging(private val config: ModConfig) {
         autostartNpc = null
         autostartDeadline = 0L
         autostartOptionWithoutClickLogged = false
+        manualAutostart = false
         rotation = null
     }
 

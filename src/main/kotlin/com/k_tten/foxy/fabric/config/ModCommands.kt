@@ -1,5 +1,7 @@
 package com.k_tten.foxy.fabric.config
 
+import com.k_tten.foxy.fabric.game.FruitDigging
+import com.k_tten.foxy.fabric.game.ZombieShootout
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.BoolArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
@@ -10,7 +12,9 @@ import net.minecraft.network.chat.Component
 object ModCommands {
     fun register(
         dispatcher: CommandDispatcher<FabricClientCommandSource>,
-        config: ModConfig
+        config: ModConfig,
+        fruitDigging: FruitDigging,
+        zombieShootout: ZombieShootout
     ) {
         dispatcher.register(
             LiteralArgumentBuilder.literal<FabricClientCommandSource>("foxy")
@@ -23,6 +27,32 @@ object ModCommands {
                         .executes { context ->
                             sendStatus(context.source, config)
                             1
+                        }
+                )
+                .then(
+                    LiteralArgumentBuilder.literal<FabricClientCommandSource>("startzombieshootout")
+                        .executes { context ->
+                            val started = zombieShootout.startAutostartManually()
+                            context.source.sendFeedback(
+                                Component.literal(
+                                    if (started) "Zombie Shootout autostart started."
+                                    else "Could not start Zombie Shootout autostart. Check that it is enabled and idle."
+                                )
+                            )
+                            if (started) 1 else 0
+                        }
+                )
+                .then(
+                    LiteralArgumentBuilder.literal<FabricClientCommandSource>("startfruitdigging")
+                        .executes { context ->
+                            val started = fruitDigging.startAutostartManually()
+                            context.source.sendFeedback(
+                                Component.literal(
+                                    if (started) "Fruit Digging autostart started."
+                                    else "Could not start Fruit Digging autostart. Check that it is enabled and idle."
+                                )
+                            )
+                            if (started) 1 else 0
                         }
                 )
                 .then(
@@ -119,9 +149,9 @@ object ModCommands {
     private fun sendStatus(source: FabricClientCommandSource, config: ModConfig) {
         source.sendFeedback(
             Component.literal(
-                "Fruit Digging: ${config.fruitDigging}, autostart: ${config.autostart}, " +
-                    "Zombie Shootout: ${config.zombieShootout}, " +
-                    "Catch A Fish: ${config.catchAFish}, verbose: ${config.verbose}"
+                "Fruit Digging: ${config.fruitDigging}\n" +
+                    "Zombie Shootout: ${config.zombieShootout}\n" +
+                    "Catch A Fish: ${config.catchAFish}\nautostart: ${config.autostart}\nverbose: ${config.verbose}"
             )
         )
     }
