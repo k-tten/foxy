@@ -97,13 +97,13 @@ class FruitDigging(private val config: ModConfig) {
             return
         }
 
-        if (normalizedMessage == normalizeMessage(FRUIT_DIGGING_MESSAGE)) {
+        if (normalizedMessage == normalizeMessage(END_TRIGGER)) {
             stop("Fruit Digging message received.")
             beginAutostart()
             return
         }
 
-        if (normalizedMessage != normalizeMessage(SHOVEL_MESSAGE)) {
+        if (normalizedMessage != normalizeMessage(START_TRIGGER)) {
             if (normalizedMessage.contains("shovel", ignoreCase = true) ||
                 normalizedMessage.contains("Pirateman", ignoreCase = true)
             ) {
@@ -710,8 +710,8 @@ class FruitDigging(private val config: ModConfig) {
         start + (end - start) * progress
 
     private companion object {
-        const val SHOVEL_MESSAGE = "[NPC] Carnival Pirateman: Here's yer shovel, then."
-        const val FRUIT_DIGGING_MESSAGE = "                               Fruit Digging"
+        const val START_TRIGGER = "[NPC] Carnival Pirateman: Here's yer shovel, then."
+        const val END_TRIGGER = "                               Fruit Digging"
         const val AUTOSTART_OPTION_TEXT = "Aye sure do!"
         const val RIGHT_MOUSE_BUTTON = 1
         val AUTOSTART_OPTION_PATTERN = Regex(
