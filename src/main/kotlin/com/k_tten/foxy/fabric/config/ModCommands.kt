@@ -151,7 +151,7 @@ object ModCommands {
                                             val verbose = BoolArgumentType.getBool(context, "value")
                                             config.setVerbose(verbose)
                                             context.source.sendFeedback(
-                                                Component.literal("Fruit Digging verbose: $verbose")
+                                                Component.literal("verbose: $verbose")
                                             )
                                             1
                                         }
