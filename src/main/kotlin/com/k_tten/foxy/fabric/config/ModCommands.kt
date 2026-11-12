@@ -1,5 +1,6 @@
 package com.k_tten.foxy.fabric.config
 
+import com.k_tten.foxy.fabric.game.CatchAFish
 import com.k_tten.foxy.fabric.game.FruitDigging
 import com.k_tten.foxy.fabric.game.ZombieShootout
 import com.mojang.brigadier.CommandDispatcher
@@ -13,6 +14,7 @@ object ModCommands {
     fun register(
         dispatcher: CommandDispatcher<FabricClientCommandSource>,
         config: ModConfig,
+        catchAFish: CatchAFish,
         fruitDigging: FruitDigging,
         zombieShootout: ZombieShootout
     ) {
@@ -27,6 +29,19 @@ object ModCommands {
                         .executes { context ->
                             sendStatus(context.source, config)
                             1
+                        }
+                )
+                .then(
+                    LiteralArgumentBuilder.literal<FabricClientCommandSource>("startcatchafish")
+                        .executes { context ->
+                            val started = catchAFish.startAutostartManually()
+                            context.source.sendFeedback(
+                                Component.literal(
+                                    if (started) "Catch A Fish autostart started."
+                                    else "Could not start Catch A Fish autostart. Check that it is enabled and idle."
+                                )
+                            )
+                            if (started) 1 else 0
                         }
                 )
                 .then(
@@ -85,7 +100,7 @@ object ModCommands {
                                             val enabled = BoolArgumentType.getBool(context, "value")
                                             config.setAutostart(enabled)
                                             context.source.sendFeedback(
-                                                Component.literal("Fruit Digging autostart: $enabled")
+                                                Component.literal("autostart: $enabled")
                                             )
                                             1
                                         }

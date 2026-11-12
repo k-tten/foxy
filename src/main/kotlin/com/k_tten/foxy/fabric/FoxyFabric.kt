@@ -20,13 +20,14 @@ class FoxyFabric : ModInitializer {
 
     override fun onInitialize() {
         config = ModConfig(FabricLoader.getInstance().configDir.resolve("foxy.properties"))
+        val catchAFish = CatchAFish(config)
         val fruitDigging = FruitDigging(config)
         val zombieShootout = ZombieShootout(config)
+        catchAFish.register()
         fruitDigging.register()
         zombieShootout.register()
-        CatchAFish(config).register()
         ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ ->
-            ModCommands.register(dispatcher, config, fruitDigging, zombieShootout)
+            ModCommands.register(dispatcher, config, catchAFish, fruitDigging, zombieShootout)
         }
         LOGGER.info("Initializing Foxy")
     }
